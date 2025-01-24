@@ -2,7 +2,7 @@
 /**
  * File renaming on upload - Plugin core.
  *
- * @version 2.5.2
+ * @version 2.6.1
  * @since   2.0.0
  * @author  WPFactory
  */
@@ -12,14 +12,14 @@ namespace FROU;
 use FROU\Admin_Pages\Sections\Remove_Section;
 use FROU\Admin_Pages\Settings_Page;
 use FROU\Functions\Functions;
-
 use FROU\Options\Advanced\Ignore_Empty_Extensions_Option;
-use FROU\Options\General\Enable_Option;
 use FROU\Options\Advanced\Ignore_Extensions_Option;
 use FROU\Options\Advanced\Ignore_Filenames_Option;
+use FROU\Options\General\Enable_Option;
 use FROU\Options\Options;
 use FROU\WeDevs\Settings_Api;
 use FROU\WordPress\Plugin;
+use WPFactory\WPFactory_Admin_Menu\WPFactory_Admin_Menu;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -65,6 +65,15 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		protected $options;
 
 		/**
+		 * Post Utils.
+		 *
+		 * @since 2.6.1.
+		 *
+		 * @var Post_Utils
+		 */
+		public $post_utils;
+
+		/**
 		 * instance.
 		 *
 		 * @version 1.0.0
@@ -79,13 +88,24 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		/**
 		 * Initializes.
 		 *
-		 * @version 2.4.5
+		 * @version 2.6.1
 		 * @since   2.0.0
 		 *
 		 * @param array $args
 		 */
 		public function init( $args = array() ) {
 			parent::init( $args );
+
+			// Post Utils.
+			$this->post_utils = new Post_Utils();
+			$this->post_utils->init();
+
+			// Adds cross-selling library.
+			$this->add_cross_selling_library();
+
+			// WPFactory admin menu.
+			WPFactory_Admin_Menu::get_instance();
+
 			add_action( 'init', array( $this, 'handle_settings_page' ) );
 			add_action( 'init', array( $this, 'add_options' ), 1 );
 			add_filter( 'sanitize_file_name', array( $this, 'sanitize_filename' ), 10, 2 );
@@ -99,6 +119,24 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 			//add_filter('wp_insert_attachment_data',array($this,'insert_attachment_data'),10,2);
 			//add_action('wp_insert_post',array($this,'insert_post'));
 			//add_filter('wp_insert_attachment_data',array($this,'wp_insert_attachment_data'),10,3);
+		}
+
+		/**
+		 * add_cross_selling_library.
+		 *
+		 * @version 3.5.1
+		 * @since   3.5.1
+		 *
+		 * @return void
+		 */
+		function add_cross_selling_library(){
+			if ( ! is_admin() ) {
+				return;
+			}
+			// Cross-selling library.
+			$cross_selling = new \WPFactory\WPFactory_Cross_Selling\WPFactory_Cross_Selling();
+			$cross_selling->setup( array( 'plugin_file_path'   => $this->args['plugin_file_path'] ) );
+			$cross_selling->init();
 		}
 
 		/**
@@ -357,9 +395,9 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		 * @return mixed|string
 		 */
 		public function sanitize_filename( $filename, $filename_raw ) {
-			//error_log('---');
-			//error_log(print_r($_REQUEST,true));
-			//error_log(print_r($filename,true));
+			/*error_log('--- sanitize_filename ---');
+			error_log(print_r($_REQUEST,true));
+			error_log(print_r($filename,true));*/
 
 			//Does nothing if plugin is not enabled
 			$option = new Enable_Option( array( 'section' => 'frou_general_opt' ) );
