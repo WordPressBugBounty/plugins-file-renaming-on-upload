@@ -1,10 +1,10 @@
 === Rename Media Files: Improve Your WordPress SEO ===
-Contributors: wpcodefactory, omardabbas, karzin, anbinder, algoritmika, kousikmukherjeeli
+Contributors: wpcodefactory, omardabbas, karzin, anbinder, kousikmukherjeeli
 Tags: rename, seo, media, renaming, characters
 Requires at least: 4.0.0
 Tested up to: 6.8
 Requires PHP: 5.3
-Stable tag: 2.6.5
+Stable tag: 2.6.7
 License: GNU General Public License v3.0
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
@@ -253,6 +253,14 @@ Head over to the [File Renaming on Upload plugin GitHub Repository](https://gith
 3. Setup how the rules will work on your filename
 
 == Changelog ==
+
+= 2.6.7 - 2026/01/14 =
+* Updated cross-selling library to version 1.0.9.
+* Updated Key Manager library to version 1.0.8.
+
+= 2.6.6 - 2025/10/15 =
+* Updated libraries.
+* Removed Algoritmika from contributors.
 
 = 2.6.5 - 2025/05/15 =
 * Fix - Translation loading was triggered too early.
