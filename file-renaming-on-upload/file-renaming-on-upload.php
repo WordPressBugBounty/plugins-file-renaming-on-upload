@@ -1,9 +1,11 @@
 <?php
 /*
-Plugin Name: Rename Media Files: Improve Your WordPress SEO
+Plugin Name: Rename Media Files: Improve Your SEO
 Plugin URI: https://wordpress.org/plugins/file-renaming-on-upload/
 Description: Fixes file uploads with accents and special characters by renaming them. It also improves your SEO.
-Version: 2.6.7
+Version: 2.7.1
+Requires at least: 5.3
+Requires PHP: 7.0
 Text Domain: file-renaming-on-upload
 Domain Path: /languages
 Author: WPFactory
@@ -78,10 +80,10 @@ register_activation_hook( __FILE__, function(){
 // Set transient on update
 add_action( 'upgrader_process_complete', function ( $upgrader_object, $options ) {
 	$current_plugin_path_name = plugin_basename( __FILE__ );
-	if ( $options['action'] == 'update' && $options['type'] == 'plugin' ) {
+	if ( 'update' === $options['action'] && 'plugin' === $options['type'] ) {
 		if ( isset( $options['plugins'] ) && is_array( $options['plugins'] ) ) {
 			foreach ( $options['plugins'] as $each_plugin ) {
-				if ( $each_plugin == $current_plugin_path_name ) {
+				if ( $each_plugin === $current_plugin_path_name ) {
 					set_transient( 'frou_activated_or_updated', true, 30 );
 				}
 			}

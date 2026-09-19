@@ -1,14 +1,14 @@
-=== Rename Media Files: Improve Your WordPress SEO ===
+=== Rename Media Files: Improve Your SEO ===
 Contributors: wpcodefactory, omardabbas, karzin, anbinder, kousikmukherjeeli
 Tags: rename, seo, media, renaming, characters
-Requires at least: 4.0.0
-Tested up to: 6.8
-Requires PHP: 5.3
-Stable tag: 2.6.7
+Stable tag: 2.7.1
+Requires at least: 5.3
+Tested up to: 7.1
+Requires PHP: 7.0
 License: GNU General Public License v3.0
 License URI: http://www.gnu.org/licenses/gpl-3.0.html
 
-Enhance SEO and organize media effortlessly with Rename Media Files WordPress Plugin. Fix upload issues, santize & optimize filenames, and improve SEO seamlessly.
+Enhance SEO and organize media effortlessly. Fix upload issues, sanitize & optimize filenames, and improve SEO seamlessly.
 
 == Description ==
 
@@ -16,7 +16,7 @@ Enhance SEO and organize media effortlessly with Rename Media Files WordPress Pl
 
 [Main Page](https://wpfactory.com/item/file-renaming-on-upload-wordpress-plugin/?utm_source=wporg&utm_medium=organic&utm_campaign=readme "Main Page") | [Support Forum](https://wpfactory.com/support/item/file-renaming-on-upload-wordpress-plugin/?utm_source=wporg&utm_medium=organic&utm_campaign=readme "Support Forum") | [Documentation & How to](https://wpfactory.com/docs/file-renaming-on-upload-wordpress-plugin/?utm_source=wporg&utm_medium=organic&utm_campaign=readme "Documentation & How to")
 
-The "Rename Media Files: Improve Your WordPress SEO" plugin will simplify the process of managing media file names (images, PDFs, etc) and metadata, ensuring a tidy and search engine-friendly media repository.
+The "Rename Media Files: Improve Your SEO" plugin will simplify the process of managing media file names (images, PDFs, etc) and metadata, ensuring a tidy and search engine-friendly media repository.
 
 If you're an SEO guru and would like to make a better website for search engines by focusing on Image SEO, or someone who enjoys their files to be perfectly organized, this plugin will turn your dreams into reality.
 
@@ -84,7 +84,7 @@ Customize file renaming behavior with advanced filtering options. Choose to igno
 
 ## 🏆 Do More: PRO Version##
 
-For those who would like to go further and beyond, we have a premium version of [Rename Media Files: Improve Your WordPress SEO](https://wpfactory.com/item/file-renaming-on-upload-wordpress-plugin/?utm_source=wporg&utm_medium=organic&utm_campaign=readme) plugin.
+For those who would like to go further and beyond, we have a premium version of [Rename Media Files: Improve Your SEO](https://wpfactory.com/item/file-renaming-on-upload-wordpress-plugin/?utm_source=wporg&utm_medium=organic&utm_campaign=readme) plugin.
 
 ### 🏆 Rename Media on Upload Based on ANYTHING ###
 
@@ -211,6 +211,7 @@ It's the option where you can put your rules or any other characters you want to
 = Are there any hooks available?
 * **frou_sanitize_file_name** Creates custom rules. Take a look on (Can I create a custom rule?)
 * **frou_ignored_extensions** Ignores extensions. Take a look on (How to ignore extensions programmatically?)
+* **frou_is_upload_in_progress** Filters whether a file upload is currently in progress. Return `true` to force filename sanitization outside uploads (e.g. when renaming files manually).
 
 = How to ignore extensions programmatically?
 You can use the **'frou_ignored_extensions'** filter to ignore extensions programmatically.
@@ -253,6 +254,33 @@ Head over to the [File Renaming on Upload plugin GitHub Repository](https://gith
 3. Setup how the rules will work on your filename
 
 == Changelog ==
+
+= 2.7.1 - 15/09/2026 =
+* Fix - Declared `Requires PHP` (7.0) in the readme and plugin header, matching the code syntax.
+* Fix - Upload-in-progress flag is now cleared when the upload finishes, fails, or the request ends, so sanitization can't leak after sideloads or failed uploads.
+* Fix - Code refactoring.
+* Fix - Fixed security issues.
+
+= 2.7.0 - 10/09/2026 =
+* Fix - Fixed `.gitattributes` file.
+* Fix - `Requires at least` now uses a major version only (5.3).
+* Dev - Excluded `git-tag.sh` from the distribution archive.
+* Fix - Filename sanitization now only runs while a file upload is actually in progress, so unrelated filename sanitization by WordPress core or other plugins is no longer affected.
+* Fix - "Update permalink" option no longer relies on `sanitize_file_name` hook priorities and only updates the attachment slug when the file was actually renamed.
+* Fix - Fixed security issues.
+* Dev - New filter: `frou_before_sanitize_file_name`.
+* Dev - New filter: `frou_is_upload_in_progress`.
+* Tested up to: 7.1.
+
+= 2.6.9 - 07/08/2026 =
+* Dev - Removed `load_plugin_textdomain` and `load_textdomain()` functions.
+* Fix - Fixed security issues.
+* Dev - Updated Admin Menu library to v1.1.2.
+* Dev - Updated Cross-Selling library to v1.1.3.
+* Dev - Updated Promoting Notice library to v1.0.7.
+
+= 2.6.8 - 23/05/2026 =
+* Tested up to: 7.0.
 
 = 2.6.7 - 2026/01/14 =
 * Updated cross-selling library to version 1.0.9.

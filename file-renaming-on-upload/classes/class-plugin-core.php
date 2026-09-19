@@ -2,7 +2,7 @@
 /**
  * File renaming on upload - Plugin core.
  *
- * @version 2.6.1
+ * @version 2.7.2
  * @since   2.0.0
  * @author  WPFactory
  */
@@ -56,6 +56,18 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		public $current_filename_original;
 
 		/**
+		 * upload_in_progress.
+		 *
+		 * Whether a file upload (upload or sideload) is currently being handled
+		 * by WordPress, so filename sanitization is only modified on upload.
+		 *
+		 * @since 2.7.0
+		 *
+		 * @var bool
+		 */
+		public $upload_in_progress = false;
+
+		/**
 		 * options.
 		 *
 		 * @since 1.0.0
@@ -88,10 +100,10 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		/**
 		 * Initializes.
 		 *
-		 * @version 2.6.1
+		 * @version 2.7.2
 		 * @since   2.0.0
 		 *
-		 * @param array $args
+		 * @param   array  $args
 		 */
 		public function init( $args = array() ) {
 			parent::init( $args );
@@ -106,19 +118,33 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 			// WPFactory admin menu.
 			WPFactory_Admin_Menu::get_instance();
 
+			// Settings.
 			add_action( 'init', array( $this, 'handle_settings_page' ) );
 			add_action( 'init', array( $this, 'add_options' ), 1 );
-			add_filter( 'sanitize_file_name', array( $this, 'sanitize_filename' ), 10, 2 );
+
+			// Scopes filename sanitization to actual uploads (upload or sideload), so unrelated sanitize_file_name calls are not modified.
+			add_filter( 'wp_handle_upload_prefilter', array( $this, 'set_upload_in_progress' ) );
+			add_filter( 'wp_handle_sideload_prefilter', array( $this, 'set_upload_in_progress' ) );
+
+			// Clear the flag when the upload fails too (see add_upload_error_cleanup()). These hooks exist since WordPress 5.7.
+			add_filter( 'wp_handle_upload_overrides', array( $this, 'add_upload_error_cleanup' ) );
+			add_filter( 'wp_handle_sideload_overrides', array( $this, 'add_upload_error_cleanup' ) );
+
+			// Fires for both successful uploads and successful sideloads (WordPress core always applies this single filter, differentiating only via the $context arg).
+			add_filter( 'wp_handle_upload', array( $this, 'clear_upload_in_progress' ), PHP_INT_MAX );
 			add_action( 'admin_init', array( $this, 'add_promoting_notice' ) );
-			//add_action( 'admin_notices', array( $this, 'create_notice' ) );
+
+			// Ignored files.
 			add_filter( 'frou_filename_allowed', array( $this, 'block_ignored_filenames' ), 10, 3 );
+
+			// File extensions.
 			add_filter( 'frou_filename_allowed', array( $this, 'block_renaming_by_extension' ), 10, 3 );
-			add_filter( 'frou_renaming_validation', array( $this, 'disable_renaming_on_wc_export' ),10,2 );
+
+			// WC Report.
+			add_filter( 'frou_renaming_validation', array( $this, 'disable_renaming_on_wc_export' ), 10, 2 );
+
+			// Save original filename.
 			add_action( 'add_attachment', array( $this, 'save_original_file_name' ) );
-			//add_action( 'add_attachment', array( $this, 'add_attachment' ) );
-			//add_filter('wp_insert_attachment_data',array($this,'insert_attachment_data'),10,2);
-			//add_action('wp_insert_post',array($this,'insert_post'));
-			//add_filter('wp_insert_attachment_data',array($this,'wp_insert_attachment_data'),10,3);
 		}
 
 		/**
@@ -129,13 +155,13 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		 *
 		 * @return void
 		 */
-		function add_cross_selling_library(){
+		function add_cross_selling_library() {
 			if ( ! is_admin() ) {
 				return;
 			}
 			// Cross-selling library.
 			$cross_selling = new \WPFactory\WPFactory_Cross_Selling\WPFactory_Cross_Selling();
-			$cross_selling->setup( array( 'plugin_file_path'   => $this->args['plugin_file_path'] ) );
+			$cross_selling->setup( array( 'plugin_file_path' => $this->args['plugin_file_path'] ) );
 			$cross_selling->init();
 		}
 
@@ -167,7 +193,7 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		/**
 		 * Disables renaming when using WooCommerce Export Products.
 		 *
-		 * @version 2.3.9
+		 * @version 2.7.0
 		 * @since   2.3.9
 		 *
 		 * @param $validation
@@ -184,20 +210,21 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 				return $validation;
 			}
 			if (
-				'woocommerce_do_ajax_product_export' == $info['request']['action'] ||
-				'download_product_csv' == $info['request']['action']
+				'woocommerce_do_ajax_product_export' === $info['request']['action'] ||
+				'download_product_csv' === $info['request']['action']
 			) {
 				$validation = false;
 			}
+
 			return $validation;
 		}
 
 		/**
-         * Blocks renaming by extension
-         *
+		 * Blocks renaming by extension
+		 *
 		 * @version 2.3.9
 		 * @since   2.3.1
-         *
+		 *
 		 * @param $allowed
 		 * @param $filename
 		 * @param $infs
@@ -209,12 +236,13 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 			if ( ! empty( $extension ) && ! $this->is_extension_allowed( $extension ) ) {
 				$allowed = false;
 			}
+
 			return $allowed;
 		}
 
 		/**
-         * Blocks renaming by filename
-         *
+		 * Blocks renaming by filename
+		 *
 		 * @param $allowed
 		 * @param $filename
 		 * @param $infs
@@ -226,6 +254,7 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 			if ( ! empty( $info ) && ! $this->is_filename_allowed( $info ) ) {
 				$allowed = false;
 			}
+
 			return $allowed;
 		}
 
@@ -262,8 +291,8 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		 * @version 2.0.0
 		 * @since   2.0.0
 		 *
-		 * @param $filename
-		 * @param array $args
+		 * @param          $filename
+		 * @param   array  $args
 		 *
 		 * @return mixed
 		 */
@@ -288,8 +317,8 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		 * @version 2.0.0
 		 * @since   2.0.0
 		 *
-		 * @param $filename
-		 * @param array $args
+		 * @param          $filename
+		 * @param   array  $args
 		 *
 		 * @return mixed
 		 */
@@ -314,13 +343,14 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		 */
 		protected function add_separator( $filename, $args ) {
 			$separator = $args['structure']['separator'];
+
 			return preg_replace( '/\}\{/U', "}{$separator}{", $filename );
 		}
 
 		/**.
 		 * Checks if extension is allowed for renaming.
 		 *
-		 * @version 2.1.8
+		 * @version 2.7.0
 		 * @since   2.1.1
 		 *
 		 * @param $extension
@@ -336,17 +366,18 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 				$ignored_extensions_arr = array_map( 'trim', $ignored_extensions_arr );
 				$ignored_extensions_arr = array_map( 'sanitize_text_field', $ignored_extensions_arr );
 				$ignored_extensions_arr = array_unique( $ignored_extensions_arr );
-				if ( ! empty( $ignored_extensions_str ) && in_array( $extension, $ignored_extensions_arr ) ) {
+				if ( ! empty( $ignored_extensions_str ) && in_array( $extension, $ignored_extensions_arr, true ) ) {
 					return false;
 				}
 			}
+
 			return true;
 		}
 
 		/**
 		 * Checks if filename is allowed for renaming.
 		 *
-		 * @version 2.1.1
+		 * @version 2.7.0
 		 * @since   2.1.1
 		 *
 		 * @param $filename
@@ -375,11 +406,152 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 				$ignored_filenames_arr = explode( ",", $ignored_filenames_str );
 				$ignored_filenames_arr = array_map( 'trim', $ignored_filenames_arr );
 				$ignored_filenames_arr = array_map( 'sanitize_text_field', $ignored_filenames_arr );
-				if ( in_array( $info['filename'], $ignored_filenames_arr ) ) {
+				if ( in_array( $info['filename'], $ignored_filenames_arr, true ) ) {
 					return false;
 				}
 			}
+
 			return true;
+		}
+
+		/**
+		 * set_upload_in_progress.
+		 *
+		 * Marks the request as handling a file upload (or sideload), so filename
+		 * sanitization is only modified while an upload is actually taking place.
+		 * Attaches the sanitize_file_name filter for the duration of the upload
+		 * only, instead of leaving it registered for the whole request.
+		 *
+		 * @version 2.7.2
+		 * @since   2.7.0
+		 *
+		 * @param   array  $file
+		 *
+		 * @return array
+		 */
+		public function set_upload_in_progress( $file ) {
+			$this->upload_in_progress = true;
+
+			add_filter( 'sanitize_file_name', array( $this, 'sanitize_filename_on_upload' ), 10, 2 );
+
+			// Safety net: reset the flag when the request ends, even if the
+			// upload flow is sideloaded or fails before wp_handle_upload runs.
+			add_action( 'shutdown', array( $this, 'clear_upload_in_progress_on_shutdown' ) );
+
+			return $file;
+		}
+
+		/**
+		 * clear_upload_in_progress.
+		 *
+		 * Clears the upload flag once WordPress finishes handling the upload,
+		 * restoring the default sanitize_file_name behaviour for the rest of the request.
+		 *
+		 * @version 2.7.2
+		 * @since   2.7.0
+		 *
+		 * @param   array  $upload
+		 *
+		 * @return array
+		 */
+		public function clear_upload_in_progress( $upload ) {
+			$this->deactivate_upload_in_progress();
+
+			return $upload;
+		}
+
+		/**
+		 * add_upload_error_cleanup.
+		 *
+		 * Wraps the upload error handler so the upload flag is cleared even when
+		 * _wp_handle_upload() fails, which otherwise returns without firing the
+		 * wp_handle_upload filter. This keeps filename sanitization from leaking
+		 * to later sanitize_file_name calls in the same request.
+		 *
+		 * @version 2.7.2
+		 * @since   2.7.0
+		 *
+		 * @param   array|false  $overrides  Upload override parameters.
+		 *
+		 * @return array
+		 */
+		public function add_upload_error_cleanup( $overrides ) {
+			if ( ! is_array( $overrides ) ) {
+				$overrides = array();
+			}
+
+			$original_handler = isset( $overrides['upload_error_handler'] ) && is_callable( $overrides['upload_error_handler'] ) ? $overrides['upload_error_handler'] : 'wp_handle_upload_error';
+
+			$overrides['upload_error_handler'] = function ( &$file, $message ) use ( $original_handler ) {
+				$this->deactivate_upload_in_progress();
+
+				return call_user_func_array( $original_handler, array( &$file, $message ) );
+			};
+
+			return $overrides;
+		}
+
+		/**
+		 * clear_upload_in_progress_on_shutdown.
+		 *
+		 * Resets the upload flag at the end of the request so filename
+		 * sanitization can never leak past a sideload or a failed upload.
+		 *
+		 * @version 2.7.2
+		 * @since   2.7.0
+		 */
+		public function clear_upload_in_progress_on_shutdown() {
+			$this->deactivate_upload_in_progress();
+		}
+
+		/**
+		 * deactivate_upload_in_progress.
+		 *
+		 * Single place that turns the upload flag off and detaches the
+		 * sanitize_file_name filter, so it never stays registered on the hook
+		 * stack once the upload (or sideload) has finished, failed, or the
+		 * request is shutting down.
+		 *
+		 * @version 2.7.2
+		 * @since   2.7.2
+		 */
+		protected function deactivate_upload_in_progress() {
+			$this->upload_in_progress = false;
+
+			remove_filter( 'sanitize_file_name', array( $this, 'sanitize_filename_on_upload' ), 10 );
+		}
+
+		/**
+		 * is_upload_in_progress.
+		 *
+		 * @version 2.7.0
+		 * @since   2.7.0
+		 *
+		 * @return bool
+		 */
+		public function is_upload_in_progress() {
+			return apply_filters( 'frou_is_upload_in_progress', (bool) $this->upload_in_progress );
+		}
+
+		/**
+		 * sanitize_filename_on_upload.
+		 *
+		 * Callback for the sanitize_file_name filter, keeping the exact
+		 * signature of the hook. Only attached to the hook while an upload is
+		 * actually in progress (see set_upload_in_progress() /
+		 * deactivate_upload_in_progress()), so unrelated sanitize_file_name
+		 * calls elsewhere in WordPress are never touched by this plugin.
+		 *
+		 * @version 2.7.2
+		 * @since   2.7.0
+		 *
+		 * @param   string  $filename      Sanitized file name.
+		 * @param   string  $filename_raw  The filename prior to sanitization.
+		 *
+		 * @return mixed|string
+		 */
+		public function sanitize_filename_on_upload( $filename, $filename_raw ) {
+			return $this->sanitize_filename( $filename, $filename_raw );
 		}
 
 		/**
@@ -387,17 +559,20 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		 *
 		 * It's the main function of this plugin.
 		 *
-		 * @version 2.5.2
+		 * @version 2.7.2
 		 * @since   2.0.0
 		 *
-		 * @param $filename
+		 * @param   string  $filename
+		 * @param   string  $filename_raw
+		 * @param   bool    $ignore_upload_check  Optional. Set to true when calling this method directly, outside of the sanitize_file_name filter (e.g. renaming files manually).
 		 *
 		 * @return mixed|string
 		 */
-		public function sanitize_filename( $filename, $filename_raw ) {
-			/*error_log('--- sanitize_filename ---');
-			error_log(print_r($_REQUEST,true));
-			error_log(print_r($filename,true));*/
+		public function sanitize_filename( $filename, $filename_raw, $ignore_upload_check = false ) {
+			// Only acts while a file upload is being handled (or when explicitly forced), so unrelated sanitize_file_name calls are not affected.
+			if ( ! $ignore_upload_check && ! $this->is_upload_in_progress() ) {
+				return $filename;
+			}
 
 			//Does nothing if plugin is not enabled
 			$option = new Enable_Option( array( 'section' => 'frou_general_opt' ) );
@@ -411,7 +586,20 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 			$filename_original = $info['filename'];
 
 			$allowed = apply_filters( 'frou_filename_allowed', true, $filename, array( 'info' => $info, 'extension' => $extension ) );
-			$allowed_to_rename = apply_filters( 'frou_renaming_validation', true, array( 'request' => $_REQUEST, 'info' => $info, 'extension' => $extension, 'filename' => $filename, 'filename_raw' => $filename_raw ) );
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Filter callback, not a form handler. WordPress core verifies upload nonces before sanitize_file_name runs; the array is sanitized below and passed as read-only context.
+			$request_raw = isset( $_REQUEST ) ? wp_unslash( $_REQUEST ) : array();
+			$request     = map_deep( $request_raw, 'sanitize_text_field' );
+			$allowed_to_rename = apply_filters(
+				'frou_renaming_validation',
+				true,
+				array(
+					'request'      => $request,
+					'info'         => $info,
+					'extension'    => $extension,
+					'filename'     => $filename,
+					'filename_raw' => $filename_raw,
+				)
+			);
 			if ( ! $allowed || ! $allowed_to_rename ) {
 				return $filename;
 			}
@@ -424,13 +612,21 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 				return $filename;
 			}
 
-			// Cancels in case of using github-updater option_page
-			if ( isset( $_GET['page'] ) && $_GET['page'] == 'github_updater' ) {
+			// Cancels in case of using github-updater option_page.
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Not a form handler; reading GET/POST only to detect a specific admin page context.
+			$get_page = isset( $_GET['page'] ) ? sanitize_text_field( wp_unslash( $_GET['page'] ) ) : '';
+			if ( 'github_updater' === $get_page ) {
 				return $filename;
 			}
-			if ( isset( $_POST['option_page'] ) && $_POST['option_page'] == 'github_updater' ) {
-				return $filename;
+			if ( isset( $_POST['option_page'] ) ) {
+				// phpcs:ignore WordPress.Security.NonceVerification.Missing -- Filter callback runs in unpredictable contexts (AJAX, REST, WP-CLI, etc.); nonce action is unknowable here.
+				$post_option_page = sanitize_text_field( wp_unslash( $_POST['option_page'] ) );
+				if ( 'github_updater' === $post_option_page ) {
+					return $filename;
+				}
 			}
+			// Fires right before the plugin applies its renaming rules, passing the original filename and its info.
+			$filename = apply_filters( 'frou_before_sanitize_file_name', $filename, $info );
 
 			// Gets plugin rules
 			$filename_arr = apply_filters( 'frou_sanitize_file_name',
@@ -447,7 +643,7 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 			);
 
 			$filename_arr_rules = $filename_arr['structure']['rules'];
-			if( empty( $filename_arr_rules ) ){
+			if ( empty( $filename_arr_rules ) ) {
 				return $filename;
 			}
 
@@ -464,7 +660,7 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 				$extension = ! empty( $filename_arr['new_extension'] ) ? $filename_arr['new_extension'] : $extension;
 				$filename  = $filename . '.' . $extension;
 			}
-			//error_log('FINAL: '.print_r($filename,true));
+
 			return $filename;
 		}
 
@@ -474,8 +670,8 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		 * @version 2.5.2
 		 * @since   2.5.2
 		 *
-		 * @param $filename
-		 * @param array $args
+		 * @param          $filename
+		 * @param   array  $args
 		 *
 		 * @return mixed
 		 */
@@ -485,6 +681,7 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 					$filename = str_replace( "{" . $key . "}", $translation, $filename );
 				}
 			}
+
 			return $filename;
 		}
 
@@ -510,6 +707,7 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 					$string = $object->post_title;
 				}
 			}
+
 			return $string;
 		}
 
@@ -562,7 +760,7 @@ if ( ! class_exists( 'FROU\Plugin_Core' ) ) {
 		 * @version 2.0.0
 		 * @since   2.0.0
 		 *
-		 * @param Options $options
+		 * @param   Options  $options
 		 */
 		public function set_options( $options ) {
 			$this->options = $options;
